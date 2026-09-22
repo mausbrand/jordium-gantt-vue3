@@ -74,6 +74,8 @@ const props = withDefaults(defineProps<Props>(), {
   useDefaultMilestoneDialog: true,
   toolbarConfig: () => ({}),
   showToolbar: true,
+  autoCenterToday: true,
+  showTimeCursor: false,
   onTodayLocate: undefined,
   onExportCsv: undefined,
   onExportPdf: undefined,
@@ -169,6 +171,9 @@ const emit = defineEmits([
   // v1.13.0 CalendarView 任务点击/拖拽移动转发事件
   'calendar-task-click',
   'calendar-task-move',
+  // PATCH (viur): fires whenever the task list sidebar is shown or hidden, so a host can keep
+  // two charts in sync.
+  'task-list-visible-change',
   // v1.12.5 ResourceUsageView 转发事件
   'resource-usage-scale-change',
   'resource-usage-cell-click',
@@ -617,6 +622,12 @@ interface Props {
   // PATCH (viur): Anker-Datum für den initialen Scroll. Wenn gesetzt, scrollt die Timeline beim
   // Laden (und bei Scale-Wechsel) LINKSBÜNDIG auf dieses Datum, statt „heute" zu zentrieren.
   initialScrollDate?: string | Date | null
+  // PATCH (viur): false keeps this instance from scrolling its timeline to today on its own.
+  // An `initialScrollDate` still wins and is scrolled to.
+  autoCenterToday?: boolean
+  // PATCH (viur): shows the time badge under the cursor without the editing modes
+  // (`enableTimeDraw`/`enableTimePick`) that otherwise bring it along.
+  showTimeCursor?: boolean
   // 是否使用默认的TaskDrawer
   useDefaultDrawer?: boolean
   // 是否使用默认的MilestoneDialog
@@ -1431,6 +1442,13 @@ watch(
     }
   }
 )
+
+// PATCH (viur): reports every sidebar visibility change, from the splitter arrow,
+// `setTaskListVisible` or the `taskListVisible` prop. Emitted after the state changed, so a prop
+// echoing the same value back cannot interrupt the toggle animation.
+watch(isTaskListVisible, visible => {
+  emit('task-list-visible-change', visible)
+})
 
 // 动画状态管理
 const isAnimating = ref(false)
@@ -4314,6 +4332,8 @@ defineExpose({
             :start-date="timelineDateRange.min"
             :end-date="timelineDateRange.max"
             :initial-scroll-date="props.initialScrollDate"
+            :auto-center-today="props.autoCenterToday"
+            :show-time-cursor="props.showTimeCursor"
             :scale-configs="mergedScaleConfigs"
             :working-hours="props.workingHours"
             :task-bar-config="props.taskBarConfig"

@@ -3106,6 +3106,10 @@ const shouldShowProgress = computed(() => {
   return true
 })
 
+// PATCH (viur): `progressLabel` on the task replaces the percentage shown on the bar. An empty
+// string drops the progress text entirely, including the parentheses on a parent bar.
+const progressText = computed(() => props.task.progressLabel ?? `${props.task.progress || 0}%`)
+
 // Helper functions to create type-safe style objects
 const getNameStyles = () => {
   const styles = stickyStyles.value
@@ -3755,7 +3759,9 @@ const handleAnchorDragEnd = (anchorEvent: {
       <!-- 父级任务的标题（直接在内部居中显示）：above 模式时隐藏，改由 task-title-above 渲染 -->
       <div v-if="isParent && barConfig.titlePosition !== 'above'" class="parent-label-inner">
         <slot v-if="hasContentSlot" name="custom-task-content" v-bind="slotPayload" />
-        <template v-else> {{ task.name }} ({{ task.progress || 0 }}%) </template>
+        <template v-else>
+          {{ task.name }}<template v-if="progressText"> ({{ progressText }})</template>
+        </template>
       </div>
 
       <!-- v1.12.0 标题悬浮在 Bar 上方（titlePosition: 'above' 模式，含 parent 任务）
@@ -3771,7 +3777,9 @@ const handleAnchorDragEnd = (anchorEvent: {
         :style="aboveTitleStyle"
       >
         <slot v-if="hasContentSlot" name="custom-task-content" v-bind="slotPayload" />
-        <span v-else>{{ task.name }}{{ isParent ? ` (${task.progress || 0}%)` : '' }}</span>
+        <span v-else
+          >{{ task.name }}{{ isParent && progressText ? ` (${progressText})` : '' }}</span
+        >
       </div>
 
       <!-- 完成进度条（非父级任务） -->
@@ -3934,6 +3942,7 @@ const handleAnchorDragEnd = (anchorEvent: {
           v-if="
             barConfig.showProgress &&
             shouldShowProgress &&
+            progressText &&
             !(showActualTaskbar && hasActualProgress)
           "
           class="task-progress"
@@ -3942,7 +3951,7 @@ const handleAnchorDragEnd = (anchorEvent: {
             ...(rowHeight < 40 ? { lineHeight: '1', fontSize: '9px' } : {}),
           }"
         >
-          {{ task.progress || 0 }}%
+          {{ progressText }}
         </div>
       </div>
 
@@ -4088,9 +4097,9 @@ const handleAnchorDragEnd = (anchorEvent: {
           <span class="tooltip-label"> {{ t('actualHours') }}:</span>
           <span class="tooltip-value">{{ workHourInfo.used }}h</span>
         </div>
-        <div class="tooltip-row">
+        <div v-if="progressText" class="tooltip-row">
           <span class="tooltip-label"> {{ t('progress') }}:</span>
-          <span class="tooltip-value">{{ task.progress || 0 }}%</span>
+          <span class="tooltip-value">{{ progressText }}</span>
         </div>
         <!-- v1.9.0 资源冲突警告 -->
         <div v-if="props.hasResourceConflict" class="tooltip-row tooltip-warning">

@@ -13,6 +13,9 @@ export interface Task {
   actualStartDate?: string // 实际开始日期
   actualEndDate?: string // 实际结束日期
   progress?: number
+  // PATCH (viur): text shown on the bar instead of the percentage; the progress fill still
+  // follows `progress`. An empty string shows no progress text at all.
+  progressLabel?: string
   estimatedHours?: number
   actualHours?: number
   parentId?: number // 上级任务ID

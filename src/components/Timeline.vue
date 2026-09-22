@@ -60,6 +60,12 @@ interface Props {
   endDate: Date
   // PATCH (viur): Anker-Datum für den initialen Scroll (linksbündig). Ohne Wert → „heute" zentriert.
   initialScrollDate?: string | Date | null
+  // PATCH (viur): false keeps the timeline from scrolling to today on its own (mount, data
+  // change, scale change). An `initialScrollDate` still wins and is scrolled to.
+  autoCenterToday?: boolean
+  // PATCH (viur): shows the time badge under the cursor without the editing modes
+  // (`enableTimeDraw`/`enableTimePick`) that otherwise bring it along.
+  showTimeCursor?: boolean
   useDefaultDrawer?: boolean
   useDefaultMilestoneDialog?: boolean
   onTaskDelete?: (task: Task) => void
@@ -104,6 +110,8 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   tasks: () => [],
   milestones: () => [],
+  autoCenterToday: true,
+  showTimeCursor: false,
   useDefaultDrawer: true,
   useDefaultMilestoneDialog: true,
   onTaskDelete: undefined,
@@ -3537,6 +3545,14 @@ watch(
 
 // 将今日定位到时间线中间位置
 const scrollToTodayCenter = (retry = 0) => {
+  // PATCH (viur): self-positioning off and no anchor date -> do not scroll at all. One guard for
+  // every trigger (mount, data change, scale change). The init flags are released anyway; they
+  // would otherwise wait forever for a scroll that never happens and keep the bubbles hidden.
+  if (props.autoCenterToday === false && !props.initialScrollDate) {
+    isInitialScrolling.value = false
+    hideBubbles.value = false
+    return
+  }
   // 开始滚动时隐藏半圆
   hideBubbles.value = true
   isInitialScrolling.value = true
@@ -5971,6 +5987,10 @@ const formatTimeDrawTaskDate = (ms: number): string => {
 
 // Cursor-Badge-Zustand
 const timeCursor = reactive({ visible: false, x: 0, y: 0, ms: 0, shift: false, blocked: false })
+// Who shows the badge: both editing modes need it, `showTimeCursor` asks for it on its own.
+const timeCursorEnabled = computed(
+  () => props.enableTimeDraw || props.enableTimePick || props.showTimeCursor
+)
 // Aufzieh-Zustand (primitiv → reaktive Vorschau); der Task selbst liegt plain in drawTask
 const timeDraw = reactive({ active: false, rowIndex: 0, startMs: 0, endMs: 0 })
 let drawTask: Task | null = null
@@ -6036,7 +6056,7 @@ const onTimeDrawShiftKey = (event: KeyboardEvent): void => {
 }
 
 const onTimeCursorMove = (event: MouseEvent): void => {
-  if (!props.enableTimeDraw && !props.enableTimePick) return
+  if (!timeCursorEnabled.value) return
   const ms = timeDrawEventToMs(event.clientX)
   if (ms === null) return
   timeCursor.shift = event.shiftKey
@@ -7185,10 +7205,10 @@ onUnmounted(() => {
     </div>
   </Teleport>
 
-  <!-- Cursor-Zeit-Badge (folgt dem Cursor über der Timeline; enableTimeDraw) -->
+  <!-- Time badge following the cursor over the timeline (enableTimeDraw/Pick, showTimeCursor) -->
   <Teleport to="body">
     <div
-      v-if="(props.enableTimeDraw || props.enableTimePick) && timeCursor.visible"
+      v-if="timeCursorEnabled && timeCursor.visible"
       class="jg-time-cursor-badge"
       :style="{
         left: `${timeCursor.x + 14}px`,
